@@ -273,31 +273,303 @@
 // export default App;
 
 
+// import { FaceMesh } from "@mediapipe/face_mesh";
+// import React, { useRef, useEffect, useState, useCallback } from "react";
+// import * as Facemesh from "@mediapipe/face_mesh";
+// import * as cam from "@mediapipe/camera_utils";
+// import Webcam from "react-webcam";
+// import Chart from "react-apexcharts";
+
+// export default function EmotionAnalyticsDashboard() {
+//   const webcamRef = useRef(null);
+//   const canvasRef = useRef(null);
+//   const [emotion, setEmotion] = useState("Neutral");
+//   const [confidence, setConfidence] = useState(0);
+//   const [status, setStatus] = useState("Initializing...");
+
+//   const [stats, setStats] = useState({
+//     total: 0,
+//     avgConfidence: 0,
+//     emotions: { Happy: 0, Surprised: 0, Serious: 0, Neutral: 0 }
+//   });
+
+//   const [history, setHistory] = useState([]);
+
+//   const detectEmotion = useCallback((landmarks) => {
+//     const left = landmarks[61];
+//     const right = landmarks[291];
+//     const top = landmarks[13];
+//     const bottom = landmarks[14];
+
+//     const mouthWidth = Math.hypot(right.x - left.x, right.y - left.y);
+//     const mouthHeight = Math.abs(bottom.y - top.y);
+//     const ratio = mouthHeight / mouthWidth || 0.2;
+
+//     let detected = "Neutral";
+//     let score = 88;
+
+//     if (ratio > 0.55) { detected = "Surprised"; score = Math.min(99, 75 + (ratio - 0.55) * 600); }
+//     else if (ratio > 0.30) { detected = "Happy"; score = Math.min(99, 80 + (ratio - 0.30) * 500); }
+//     else if (ratio < 0.12) { detected = "Serious"; score = Math.min(99, 85 + (0.12 - ratio) * 900); }
+
+//     setEmotion(detected);
+//     setConfidence(Math.round(score));
+
+//     setStats(prev => {
+//       const total = prev.total + 1;
+//       const avg = Math.round(((prev.avgConfidence * prev.total) + score) / total);
+//       return {
+//         total,
+//         avgConfidence: avg,
+//         emotions: { ...prev.emotions, [detected]: prev.emotions[detected] + 1 }
+//       };
+//     });
+
+//     setHistory(prev => [...prev.slice(-40), { emotion: detected, confidence: score }]);
+//   }, []);
+
+//   const onResults = useCallback((results) => {
+//     if (!canvasRef.current || !webcamRef.current?.video) return;
+
+//     const canvas = canvasRef.current;
+//     const ctx = canvas.getContext("2d");
+//     const width = canvas.width;
+//     const height = canvas.height;
+
+//     // Clear & background
+//     ctx.clearRect(0, 0, width, height);
+//     ctx.fillStyle = "#f8fafc";
+//     ctx.fillRect(0, 0, width, height);
+
+//     if (results.multiFaceLandmarks?.[0]) {
+//       const landmarks = results.multiFaceLandmarks[0];
+//       detectEmotion(landmarks);
+
+//       const connect = window.drawConnectors;
+//       const drawPoint = (x, y, color = "#6366f1") => {
+//         ctx.beginPath();
+//         ctx.arc(x, y, 3, 0, Math.PI * 2);
+//         ctx.fillStyle = color;
+//         ctx.fill();
+//       };
+
+//       // Draw face oval
+//       connect(ctx, landmarks, Facemesh.FACEMESH_FACE_OVAL, { color: "#6366f1", lineWidth: 2.5 });
+
+//       // Eyes + eyebrows
+//       connect(ctx, landmarks, Facemesh.FACEMESH_LEFT_EYE, { color: "#8b5cf6", lineWidth: 2 });
+//       connect(ctx, landmarks, Facemesh.FACEMESH_RIGHT_EYE, { color: "#8b5cf6", lineWidth: 2 });
+//       connect(ctx, landmarks, Facemesh.FACEMESH_LEFT_EYEBROW, { color: "#a78bfa", lineWidth: 1.8 });
+//       connect(ctx, landmarks, Facemesh.FACEMESH_RIGHT_EYEBROW, { color: "#a78bfa", lineWidth: 1.8 });
+
+//       // Lips
+//       connect(ctx, landmarks, Facemesh.FACEMESH_LIPS, { color: "#ec4899", lineWidth: 3 });
+
+//       // Key points highlight
+//       [0, 10, 152, 234, 454].forEach(i => {
+//         const p = landmarks[i];
+//         drawPoint(p.x * width, p.y * height, "#6366f1");
+//       });
+//     }
+
+//     // Draw webcam feed behind landmarks with low opacity
+//     ctx.globalAlpha = 0.35;
+//     ctx.drawImage(webcamRef.current.video, 0, 0, width, height);
+//     ctx.globalAlpha = 1;
+//   }, [detectEmotion]);
+
+//   useEffect(() => {
+//     setStatus("Loading AI Model...");
+//     const faceMesh = new FaceMesh({
+//       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+//     });
+
+//     faceMesh.setOptions({
+//       maxNumFaces: 1,
+//       refineLandmarks: true,
+//       minDetectionConfidence: 0.8,
+//       minTrackingConfidence: 0.8,
+//     });
+
+//     faceMesh.onResults(onResults);
+
+//     const camera = new cam.Camera(webcamRef.current.video, {
+//       onFrame: async () => {
+//         await faceMesh.send({ image: webcamRef.current.video });
+//       },
+//       width: 1280,
+//       height: 720,
+//     });
+
+//     camera.start().then(() => setStatus("Live • Face Detected"));
+//   }, [onResults]);
+
+//   // Charts remain same
+//   const pieSeries = Object.values(stats.emotions);
+//   const pieOptions = { chart: { type: 'donut' }, labels: ['Happy', 'Surprised', 'Serious', 'Neutral'], colors: ['#10b981', '#f59e0b', '#ef4444', '#94a3b8'], legend: { position: 'bottom' }, plotOptions: { pie: { donut: { size: '70%' } } } };
+
+//   const lineSeries = [{ name: 'Confidence', data: history.map(h => h.confidence) }];
+//   const lineOptions = { chart: { toolbar: { show: false }, sparkline: { enabled: true } }, stroke: { curve: 'smooth', width: 3 }, colors: ['#6366f1'], fill: { opacity: 0.5 } };
+
+//   const radialOptions = {
+//     chart: { type: 'radialBar' },
+//     plotOptions: { radialBar: { hollow: { size: '68%' }, track: { background: '#e2e8f0' }, dataLabels: { value: { fontSize: '2.5rem', fontWeight: 800, color: '#1e293b' } } } },
+//     colors: ['#6366f1'],
+//   };
+
+//   return (
+//     <>
+//       <div className="dashboard">
+//         <header className="header">
+//           <div>
+//             <h1>Emotion Analytics Dashboard</h1>
+//             <p>Real-time Facial Recognition with Clear Landmarks</p>
+//           </div>
+//           <div className="status"><span className="dot"></span> {status}</div>
+//         </header>
+
+//         <div className="grid">
+//           {/* FACE + LANDMARKS CARD (Perfect Fit) */}
+//           <div className="card face-card">
+//             <h3>Live Face Detection</h3>
+//             <div className="face-container">
+//               <Webcam ref={webcamRef} style={{ display: "none" }} videoConstraints={{ facingMode: "user" }} />
+//               <canvas ref={canvasRef} className="face-canvas" />
+//               <div className="face-overlay">
+//                 <div className="current-emotion">{emotion}</div>
+//                 <div className="current-conf">{confidence}%</div>
+//               </div>
+//             </div>
+//           </div>
+
+//           <div className="card emotion-card">
+//             <h3>Current Emotion</h3>
+//             <Chart options={radialOptions} series={[confidence]} type="radialBar" height={280} />
+//             <div className="emotion-big">{emotion}</div>
+//           </div>
+
+//           <div className="card stats-card">
+//             <h3>Session Stats</h3>
+//             <div className="stat">Detections <strong>{stats.total}</strong></div>
+//             <div className="stat">Avg Confidence <strong>{stats.avgConfidence}%</strong></div>
+//             <div className="stat">Dominant <strong>{Object.keys(stats.emotions).reduce((a,b) => stats.emotions[a] > stats.emotions[b] ? a : b, "Neutral")}</strong></div>
+//           </div>
+
+//           <div className="card pie-card">
+//             <h3>Emotion Distribution</h3>
+//             <Chart options={pieOptions} series={pieSeries} type="donut" height={260} />
+//           </div>
+
+//           <div className="card trend-card">
+//             <h3>Confidence Trend</h3>
+//             <Chart options={lineOptions} series={lineSeries} type="area" height={180} />
+//           </div>
+//         </div>
+
+//         <footer>Built by <strong>Ali Haider</strong></footer>
+//       </div>
+
+//       <style jsx>{`
+//         :global(body){margin:0;background:#f1f5f9;font-family:'Inter',sans-serif;color:#1e293b;}
+//         .dashboard{padding:1.5rem;max-width:1600px;margin:0 auto;}
+//         .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;flex-wrap:wrap;gap:1rem;}
+//         .header h1{font-size:2.3rem;font-weight:900;margin:0;color:#1e293b;}
+//         .status{background:#ecfdf5;color:#065f46;padding:0.6rem 1.4rem;border-radius:2rem;font-weight:600;display:flex;align-items:center;gap:10px;}
+//         .dot{width:10px;height:10px;background:#10b981;border-radius:50%;animation:pulse 2s infinite;}
+
+//         .grid{display:grid;gap:1.5rem;grid-template-columns:1fr;}
+//         @media(min-width:640px){.grid{grid-template-columns:repeat(2,1fr);}}
+//         @media(min-width:1024px){.grid{grid-template-columns:repeat(12,1fr);gap:2rem;}}
+//         @media(min-width:1024px){
+//           .face-card{grid-column:span 8;grid-row:span 2;}
+//           .emotion-card{grid-column:span 4;grid-row:span 2;}
+//           .stats-card,.pie-card,.trend-card{grid-column:span 4;}
+//         }
+
+//         .card{background:white;border-radius:1.5rem;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);transition:0.3s;}
+//         .card:hover{transform:translateY(-8px);box-shadow:0 20px 40px rgba(0,0,0,0.14);}
+//         .card h3{margin:0;padding:1.5rem 1.5rem 0;font-size:1.35rem;font-weight:700;color:#1e293b;}
+
+//         /* FACE CARD - Perfect Face + Landmarks */
+//         .face-container{
+//           position:relative;
+//           width:100%;
+//           height:420px;
+//           background:#f8fafc;
+//           border-radius:0 0 1.5rem 1.5rem;
+//           overflow:hidden;
+//           display:flex;
+//           justify-content:center;
+//           align-items:center;
+//         }
+//         .face-canvas{
+//           max-width:100%;
+//           max-height:100%;
+//           width:auto !important;
+//           height:auto !important;
+//           object-fit:contain;
+//         }
+//         .face-overlay{
+//           position:absolute;bottom:1.5rem;left:1.5rem;
+//           background:rgba(255,255,255,0.96);padding:1.2rem 1.8rem;
+//           border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,0.15);
+//         }
+//         .current-emotion{font-size:2.2rem;font-weight:900;color:#6366f1;margin-bottom:4px;}
+//         .current-conf{font-size:1.6rem;font-weight:700;color:#10b981;}
+
+//         .emotion-big{font-size:2.8rem;font-weight:900;text-align:center;margin-top:1rem;color:#1e293b;}
+
+//         .stat{display:flex;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;font-size:1.1rem;}
+//         .stat:last-child{border:none;}
+//         .stat strong{color:#6366f1;font-weight:800;}
+
+//         footer{text-align:center;margin-top:4rem;padding:2rem;color:#64748b;font-size:1rem;}
+
+//         @keyframes pulse{0%,100%{opacity:0.6}50%{opacity:1}}
+//         @media(max-width:640px){
+//           .face-container{height:340px;}
+//           .face-card,.emotion-card{grid-column:span 1 !important;}
+//         }
+//       `}</style>
+//     </>
+//   );
+// }
+
 
 import { FaceMesh } from "@mediapipe/face_mesh";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as Facemesh from "@mediapipe/face_mesh";
 import * as cam from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
+import Chart from "react-apexcharts";
+import html2canvas from "html2canvas";
 
-export default function App() {
+export default function EmotionAIDashboard() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  const dashboardRef = useRef(null);
+
   const [emotion, setEmotion] = useState("Neutral");
   const [confidence, setConfidence] = useState(0);
   const [status, setStatus] = useState("Initializing AI Engine...");
 
-  const connect = window.drawConnectors;
+  const [history, setHistory] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    happy: 0,
+    surprised: 0,
+    serious: 0,
+    neutral: 0,
+    avgConfidence: 0,
+  });
 
-  const detectEmotion = (landmarks) => {
-    const left = landmarks[61];
-    const right = landmarks[291];
-    const top = landmarks[13];
-    const bottom = landmarks[14];
-
-    const mouthWidth = Math.hypot(right.x - left.x, right.y - left.y);
-    const mouthHeight = Math.abs(bottom.y - top.y);
-    const ratio = mouthHeight / mouthWidth;
+  const detectEmotion = useCallback((landmarks) => {
+    const ratio =
+      Math.abs(landmarks[14].y - landmarks[13].y) /
+      Math.hypot(
+        landmarks[291].x - landmarks[61].x,
+        landmarks[291].y - landmarks[61].y
+      );
 
     let detected = "Neutral";
     let score = 88;
@@ -315,67 +587,68 @@ export default function App() {
 
     setEmotion(detected);
     setConfidence(Math.round(score));
-    setStatus("Face Detected • Real-time Analysis");
-  };
+    setStatus("Live • Face Detected");
 
-  const onResults = (results) => {
-    if (!canvasRef.current || !webcamRef.current?.video) return;
+    const newEntry = { emotion: detected, confidence: Math.round(score), time: Date.now() };
+    setHistory((prev) => [...prev.slice(-100), newEntry]);
 
-    const canvas = canvasRef.current;
-    const video = webcamRef.current.video;
-    const ctx = canvas.getContext("2d");
+    setStats((prev) => {
+      const total = prev.total + 1;
+      const newAvg = Math.round((prev.avgConfidence * prev.total + score) / total);
+      return {
+        total,
+        happy: detected === "Happy" ? prev.happy + 1 : prev.happy,
+        surprised: detected === "Surprised" ? prev.surprised + 1 : prev.surprised,
+        serious: detected === "Serious" ? prev.serious + 1 : prev.serious,
+        neutral: detected === "Neutral" ? prev.neutral + 1 : prev.neutral,
+        avgConfidence: newAvg,
+      };
+    });
+  }, []);
 
-    const container = canvas.parentElement;
-    const width = container.clientWidth;
-    const height = container.clientHeight || width * 0.75;
+  const onResults = useCallback(
+    (results) => {
+      if (!canvasRef.current || !webcamRef.current?.video) return;
 
-    canvas.width = width;
-    canvas.height = height;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
 
-    ctx.save();
-    ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
-    gradient.addColorStop(0, "#1e0038");
-    gradient.addColorStop(0.5, "#0f001a");
-    gradient.addColorStop(1, "#000000");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+      if (results.multiFaceLandmarks?.[0]) {
+        const landmarks = results.multiFaceLandmarks[0];
+        detectEmotion(landmarks);
 
-    if (results.multiFaceLandmarks?.[0]) {
-      const landmarks = results.multiFaceLandmarks[0];
-      detectEmotion(landmarks);
+        const connect = window.drawConnectors;
+        ctx.lineWidth = 2.5;
 
-      ctx.lineWidth = 1.4 + width / 1000;
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = "#c084fc";
+        connect(ctx, landmarks, Facemesh.FACEMESH_FACE_OVAL, { color: "#6366f1" });
+        connect(ctx, landmarks, Facemesh.FACEMESH_LIPS, { color: "#ec4899" });
+        connect(ctx, landmarks, Facemesh.FACEMESH_LEFT_EYE, { color: "#8b5cf6" });
+        connect(ctx, landmarks, Facemesh.FACEMESH_RIGHT_EYE, { color: "#8b5cf6" });
+      }
 
-      connect(ctx, landmarks, Facemesh.FACEMESH_FACE_OVAL, { color: "#a78bfa77" });
-      connect(ctx, landmarks, Facemesh.FACEMESH_LEFT_EYE, { color: "#c084fc" });
-      connect(ctx, landmarks, Facemesh.FACEMESH_RIGHT_EYE, { color: "#c084fc" });
-      connect(ctx, landmarks, Facemesh.FACEMESH_LIPS, { color: "#f472b6" });
-
-      ctx.shadowBlur = 0;
-    }
-
-    ctx.globalAlpha = 0.18;
-    ctx.drawImage(video, 0, 0, width, height);
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  };
+      ctx.globalAlpha = 0.35;
+      ctx.drawImage(webcamRef.current.video, 0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+    },
+    [detectEmotion]
+  );
 
   useEffect(() => {
-    setStatus("Loading AI Model...");
-
     const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
     });
 
     faceMesh.setOptions({
       maxNumFaces: 1,
       refineLandmarks: true,
-      minDetectionConfidence: 0.75,
-      minTrackingConfidence: 0.75,
+      minDetectionConfidence: 0.8,
+      minTrackingConfidence: 0.8,
     });
 
     faceMesh.onResults(onResults);
@@ -389,412 +662,187 @@ export default function App() {
     });
 
     camera.start().then(() => {
-      setStatus("AI Ready • Waiting for face");
+      setStatus("AI Engine Active • Ready");
     });
+  }, [onResults]);
 
-    const handleResize = () => {
-      if (canvasRef.current && webcamRef.current?.video) {
-        onResults({ image: webcamRef.current.video });
-      }
-    };
+  // Export Function Fixed
+  const exportDashboard = async () => {
+    if (!dashboardRef.current) return;
+    try {
+      const canvas = await html2canvas(dashboardRef.current, { scale: 2 });
+      const link = document.createElement("a");
+      link.download = `EmotionAI_Report_${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) {
+      alert("Export failed. Try again!");
+    }
+  };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // Charts Data
+  const pieSeries = [stats.happy, stats.surprised, stats.serious, stats.neutral];
+  const lineSeries = [{ name: "Confidence", data: history.map((h) => h.confidence) }];
+  const barSeries = [{ name: "Count", data: [stats.happy, stats.surprised, stats.serious, stats.neutral] }];
 
   return (
-    <>
-      <div className="emotion-app">
-        <div className="orb orb-1"></div>
-        <div className="orb orb-2"></div>
-        <div className="orb orb-3"></div>
+    <div className="dashboard" ref={dashboardRef}>
+      {/* Header */}
+      <div className="header">
+        <div className="title">
+          <h1>Emotion AI Dashboard</h1>
+          <p>Real-time Facial Emotion Recognition • MediaPipe + React</p>
+        </div>
+        <button onClick={exportDashboard} className="export-btn">
+          Export Report
+        </button>
+      </div>
 
-        <div className="container">
-          <header className="header">
-            <h1 className="title">Emotion AI</h1>
-            <p className="subtitle">Real-time Facial Emotion Recognition</p>
-          </header>
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="value">{stats.total}</div>
+          <div className="label">Total Detections</div>
+        </div>
+        <div className="stat-card">
+          <div className="value">{stats.avgConfidence}%</div>
+          <div className="label">Avg Confidence</div>
+        </div>
+        <div className="stat-card">
+          <div className="value">{emotion}</div>
+          <div className="label">Current Emotion</div>
+        </div>
+        <div className="stat-card">
+          <div className="value">{confidence}%</div>
+          <div className="label">Live Confidence</div>
+        </div>
+      </div>
 
-          <div className="card-wrapper">
-            <div className="card-glow"></div>
-            <div className="card">
-              <div className="video-container">
-                <Webcam
-                  ref={webcamRef}
-                  style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
-                  videoConstraints={{ facingMode: "user" }}
-                />
-                <canvas ref={canvasRef} className="video-canvas" />
-                <div className="status-bar">
-                  <div className="status-indicator">
-                    <span className="dot"></span>
-                    <span className="status-text">{status}</span>
-                  </div>
-                  <span className="tech-info">468 Landmarks • MediaPipe</span>
-                </div>
+      {/* Main Grid */}
+      <div className="main-grid">
+        {/* Live Face */}
+        <div className="card face-card">
+          <h3>Live Face Detection</h3>
+          <div className="face-container">
+            <Webcam ref={webcamRef} style={{ display: "none" }} videoConstraints={{ facingMode: "user" }} />
+            <canvas ref={canvasRef} className="face-canvas" />
+            <div className="live-indicator">LIVE</div>
+          </div>
+          <div className="status-text">{status}</div>
+        </div>
+
+        {/* Radial Confidence */}
+        <div className="card">
+          <h3>Confidence Meter</h3>
+          <Chart
+            options={{
+              plotOptions: { radialBar: { hollow: { size: "70%" }, track: { background: "#e5e7eb" } } },
+              colors: ["#6366f1"],
+              labels: ["Confidence"]
+            }}
+            series={[confidence]}
+            type="radialBar"
+            height={300}
+          />
+        </div>
+
+        {/* Emotion Distribution */}
+        <div className="card">
+          <h3>Emotion Distribution</h3>
+          <Chart
+            options={{
+              labels: ["Happy", "Surprised", "Serious", "Neutral"],
+              colors: ["#10b981", "#f59e0b", "#ef4444", "#94a3b8"],
+              legend: { position: "bottom" }
+            }}
+            series={pieSeries}
+            type="donut"
+            height={300}
+          />
+        </div>
+
+        {/* Confidence Trend */}
+        <div className="card">
+          <h3>Confidence Trend</h3>
+          <Chart
+            options={{
+              chart: { sparkline: { enabled: true } },
+              stroke: { width: 4 },
+              colors: ["#6366f1"]
+            }}
+            series={lineSeries}
+            type="area"
+            height={220}
+          />
+        </div>
+
+        {/* Emotion Frequency Bar */}
+        <div className="card">
+          <h3>Emotion Frequency</h3>
+          <Chart
+            options={{
+              xaxis: { categories: ["Happy", "Surprised", "Serious", "Neutral"] },
+              colors: ["#6366f1"]
+            }}
+            series={barSeries}
+            type="bar"
+            height={280}
+          />
+        </div>
+
+        {/* Recent Activity Log */}
+        <div className="card log-card">
+          <h3>Recent Activity</h3>
+          <div className="log">
+            {history.slice(-10).reverse().map((h, i) => (
+              <div key={i} className="log-item">
+                <span className="emo">{h.emotion}</span>
+                <span className="conf">{h.confidence}%</span>
+                <span className="time">{new Date(h.time).toLocaleTimeString()}</span>
               </div>
-
-              <div className="results">
-                <div className="result-item emotion-section">
-                  <p className="label">Detected Emotion</p>
-                  <h2 className="emotion-text">{emotion}</h2>
-                </div>
-
-                <div className="result-item confidence-section">
-                  <p className="label">Confidence Level</p>
-                  <div className="confidence-container">
-                    <div
-                      className="confidence-bar"
-                      style={{ width: `${confidence}%` }}
-                    ></div>
-                    <span className="confidence-value">
-                      {confidence}<span className="percent">%</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <footer className="footer">
-                <div className="tech-stack">
-                  <span>MediaPipe Face Mesh</span>
-                  <span>TensorFlow.js</span>
-                  <span>React </span>
-                </div>
-                <p className="author">
-                  Built by <span className="author-name">Ali Haider</span>
-                </p>
-              </footer>
-            </div>
+            ))}
+            {history.length === 0 && <div className="empty">No data yet...</div>}
           </div>
         </div>
       </div>
 
+      <footer>© 2025 Emotion AI • Built by Ali Haider</footer>
+
       <style jsx>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+        :global(body) { margin: 0; background: #f8fafc; font-family: 'Inter', sans-serif; color: #1e293b; }
+        .dashboard { padding: 2rem; min-height: 100vh; background: #f8fafc; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .title h1 { font-size: 2.8rem; font-weight: 900; margin: 0; background: linear-gradient(90deg, #6366f1, #8b5cf6); -webkit-background-clip: text; color: transparent; }
+        .title p { margin: 0.5rem 0 0; color: #64748b; }
+        .export-btn { background: #6366f1; color: white; padding: 1rem 2rem; border: none; border-radius: 1.5rem; font-weight: 700; cursor: pointer; transition: 0.3s; }
+        .export-btn:hover { background: #4f46e5; }
 
-        html,
-        body {
-          font-family: 'Inter', 'Segoe UI', sans-serif;
-          background: #000;
-          overflow-x: hidden;
-        }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.8rem; border-radius: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; }
+        .value { font-size: 3.2rem; font-weight: 900; color: #6366f1; margin: 0; }
+        .label { font-size: 1rem; color: #64748b; margin-top: 0.5rem; }
 
-        .emotion-app {
-          min-height: 100dvh;
-          background: linear-gradient(135deg, #0f001a 0%, #1a0033 50%, #000 100%);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          padding: 1.5rem 1rem;
-          padding-bottom: env(safe-area-inset-bottom, 3rem);
-          position: relative;
-          overflow-y: auto;
-          overflow-x: hidden;
-          -webkit-overflow-scrolling: touch;
-        }
+        .main-grid { display: grid; gap: 2rem; grid-template-columns: 1fr; }
+        @media (min-width: 768px) { .main-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1200px) { .main-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1600px) { .main-grid { grid-template-columns: repeat(4, 1fr); } }
 
-        .orb {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(120px);
-          opacity: 0.35;
-          pointer-events: none;
-          animation: float 25s infinite ease-in-out;
-          z-index: 1;
-        }
-        .orb-1 {
-          width: 600px;
-          height: 600px;
-          background: #9333ea;
-          top: -15%;
-          left: -15%;
-        }
-        .orb-2 {
-          width: 700px;
-          height: 700px;
-          background: #ec4899;
-          bottom: -20%;
-          right: -20%;
-          animation-delay: 8s;
-        }
-        .orb-3 {
-          width: 500px;
-          height: 500px;
-          background: #06b6d4;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          animation-delay: 16s;
-        }
+        .card { background: white; border-radius: 1.8rem; box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 1.8rem; overflow: hidden; }
+        .card h3 { margin: 0 0 1.5rem; font-size: 1.4rem; font-weight: 700; color: #1e293b; }
 
-        @keyframes float {
-          0%,
-          100% {
-            transform: translate(0, 0) rotate(0deg);
-          }
-          50% {
-            transform: translate(80px, -80px) rotate(5deg);
-          }
-        }
+        .face-container { position: relative; height: 420px; background: #f1f5f9; border-radius: 1.5rem; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .face-canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .live-indicator { position: absolute; top: 16px; right: 16px; background: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 2rem; font-weight: 700; font-size: 0.9rem; }
+        .status-text { text-align: center; margin-top: 1rem; font-weight: 600; color: #10b981; }
 
-        .container {
-          width: 100%;
-          max-width: 1400px;
-          z-index: 10;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
+        .log { max-height: 300px; overflow-y: auto; }
+        .log-item { display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #e2e8f0; font-size: 0.95rem; }
+        .emo { font-weight: 700; color: #6366f1; }
+        .conf { color: #10b981; font-weight: 600; }
+        .empty { color: #94a3b8; text-align: center; padding: 2rem; }
 
-        .header {
-          text-align: center;
-          margin-bottom: 2rem;
-          width: 100%;
-        }
-        .title {
-          font-size: clamp(2.8rem, 9vw, 6.5rem);
-          font-weight: 900;
-          background: linear-gradient(90deg, #a78bfa, #f472b6, #67e8f9);
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          letter-spacing: -2px;
-          line-height: 1;
-        }
-        .subtitle {
-          font-size: clamp(1rem, 3vw, 1.5rem);
-          color: #c084fc;
-          font-weight: 300;
-          letter-spacing: 3px;
-          margin-top: 0.5rem;
-        }
-
-        .card-wrapper {
-          position: relative;
-          width: 100%;
-          max-width: 900px;
-          border-radius: 2.5rem;
-          overflow: hidden;
-        }
-
-        .card-glow {
-          position: absolute;
-          inset: -10px;
-          background: linear-gradient(45deg, #9333ea, #ec4899, #06b6d4);
-          border-radius: inherit;
-          filter: blur(40px);
-          opacity: 0.7;
-          z-index: -1;
-        }
-
-        .card {
-          background: rgba(15, 0, 26, 0.88);
-          backdrop-filter: blur(24px);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
-        }
-
-        .video-container {
-          position: relative;
-          width: 100%;
-          aspect-ratio: 4 / 3;
-          background: #000;
-        }
-
-        .video-canvas {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .status-bar {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          padding: clamp(1rem, 3vw, 2rem);
-          background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 1rem;
-          pointer-events: none;
-          z-index: 10;
-        }
-        .status-indicator {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .dot {
-          width: 14px;
-          height: 14px;
-          background: #10b981;
-          border-radius: 50%;
-          box-shadow: 0 0 30px #10b981;
-          animation: pulse 2s infinite;
-        }
-        .status-text {
-          color: white;
-          font-weight: 600;
-          font-size: clamp(0.9rem, 2.5vw, 1.2rem);
-        }
-        .tech-info {
-          color: rgba(255,255,255,0.7);
-          font-size: clamp(0.75rem, 2vw, 1rem);
-          font-family: 'Courier New', monospace;
-        }
-
-        .results {
-          padding: clamp(2.5rem, 6vw, 4rem) clamp(2rem, 5vw, 4rem);
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 3rem;
-        }
-        @media (min-width: 768px) {
-          .results {
-            grid-template-columns: 1fr 1fr;
-          }
-        }
-
-        .label {
-          color: #c084fc;
-          font-size: clamp(1rem, 3vw, 1.4rem);
-          font-weight: 600;
-          margin-bottom: 1rem;
-          letter-spacing: 2px;
-        }
-        .emotion-text {
-          font-size: clamp(3.2rem, 11vw, 7rem);
-          font-weight: 900;
-          color: white;
-          text-shadow: 0 0 40px rgba(199, 146, 255, 0.6);
-          line-height: 1;
-        }
-
-        .confidence-container {
-          position: relative;
-          height: clamp(110px, 32vw, 190px);
-          background: rgba(255,255,255,0.06);
-          border-radius: 2rem;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.15);
-        }
-        .confidence-bar {
-          height: 100%;
-          width: 0%;
-          background: linear-gradient(to right, #9333ea, #ec4899, #06b6d4);
-          transition: width 1.8s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .confidence-value {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: clamp(2.8rem, 9vw, 5.5rem);
-          font-weight: 900;
-          color: white;
-          text-shadow: 0 0 50px rgba(0,0,0,0.8);
-        }
-        .percent {
-          font-size: 50%;
-          opacity: 0.8;
-          margin-left: 4px;
-        }
-
-        .footer {
-          padding: clamp(2rem, 5vw, 3.5rem) 2rem;
-          text-align: center;
-          border-top: 1px solid rgba(255,255,255,0.12);
-        }
-        .tech-stack {
-          display: flex;
-          justify-content: center;
-          gap: clamp(1.2rem, 4vw, 3rem);
-          margin-bottom: 1.5rem;
-          flex-wrap: wrap;
-        }
-        .tech-stack span {
-          color: rgba(255,255,255,0.65);
-          font-size: clamp(0.95rem, 2.5vw, 1.1rem);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .tech-stack span::before {
-          content: '';
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: currentColor;
-        }
-        .author {
-          font-size: clamp(1.2rem, 3.5vw, 1.8rem);
-          color: white;
-        }
-        .author-name {
-          background: linear-gradient(90deg, #a78bfa, #f472b6);
-          -webkit-background-clip: text;
-          color: transparent;
-          font-weight: 700;
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 0.7;
-          }
-          50% {
-            opacity: 1;
-          }
-        }
-
-        /* Mobile Optimizations */
-        @media (max-width: 640px) {
-          .emotion-app {
-            padding: 1rem 0.5rem;
-          }
-          .video-container {
-            aspect-ratio: 1 / 1;
-            border-radius: 2rem;
-          }
-          .card-wrapper {
-            border-radius: 2rem;
-          }
-          .status-bar {
-            flex-direction: column;
-            text-align: center;
-            padding: 1rem;
-          }
-          .results {
-            gap: 2.5rem;
-            padding: 2.5rem 1.5rem;
-          }
-        }
-
-        /* Custom Scrollbar */
-        .emotion-app::-webkit-scrollbar {
-          width: 8px;
-        }
-        .emotion-app::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .emotion-app::-webkit-scrollbar-thumb {
-          background: rgba(167, 139, 250, 0.3);
-          border-radius: 10px;
-        }
-        .emotion-app::-webkit-scrollbar-thumb:hover {
-          background: rgba(167, 139, 250, 0.6);
-        }
+        footer { text-align: center; margin-top: 4rem; padding: 2rem; color: #94a3b8; font-size: 0.95rem; }
       `}</style>
-    </>
+    </div>
   );
 }
