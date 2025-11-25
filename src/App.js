@@ -458,7 +458,7 @@ export default function App() {
                 <div className="tech-stack">
                   <span>MediaPipe Face Mesh</span>
                   <span>TensorFlow.js</span>
-                  <span>React 18</span>
+                  <span>React </span>
                 </div>
                 <p className="author">
                   Built by <span className="author-name">Ali Haider</span>
